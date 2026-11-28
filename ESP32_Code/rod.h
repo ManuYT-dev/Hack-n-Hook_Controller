@@ -5,7 +5,7 @@
 namespace rod {  // Group the sensor code under the rod name, as in rod::sample().
 constexpr int clk = 4, dt = 5;  // Map the encoder's CLK and DT outputs to Heltec GPIO4 and GPIO5.
 volatile int32_t encoderEdges = 0;  // Keep the signed crank count shared with the interrupt handler.
-constexpr uint32_t crankIdleMs = 150;  // Inaktiv nach 150 ms ohne gültige Encoder-Flanke.
+constexpr uint32_t crankIdleMs = 75;  // Inaktiv nach 75 ms ohne gültige Encoder-Flanke.
 volatile uint32_t lastCrankEdgeMs = 0;
 volatile bool crankActive = false;
 uint8_t previousAB;  // Remember the last two encoder input levels to determine direction.
