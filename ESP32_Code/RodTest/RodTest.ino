@@ -48,7 +48,7 @@ void setup() {
 void loop() {
   const rod::Sample sample = rod::sample();
   if (sample.imuValid) {
-    const int16_t raw = sample.gyro[1];
+    const int16_t raw = sample.gyro[2];
     castSpeed = (raw >= castDeadband || raw <= -castDeadband) ? raw : 0;
   } else if (rod::imuState != rod::ImuState::running) {
     castSpeed = 0;
