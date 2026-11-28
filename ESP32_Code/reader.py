@@ -6,63 +6,31 @@ DEVICE_NAME = "Heltec-Random-Data"
 SERVICE_UUID = "2bcae4c0-7d55-4ce6-a628-823f5f3bdc01"
 CHAR_UUID = "2bcae4c0-7d55-4ce6-a628-823f5f3bdc02"
 
-MAP_NAMES = {1: "FishingRod", 2: "Boat", 3: "Global"}
-BUTTONS = {
-    (1, 1): "Throw", (1, 5): "CancelCast",
-    (1, 6): "SwitchBait", (1, 7): "ToggleReady",
-    (2, 1): "Anchor", (2, 2): "Interact", (2, 3): "ToggleFishing",
-    (2, 4): "Boost", (3, 0): "Pause",
-}
-AXES = {(2, 0): "Drive", (1, 8): "CastSpeed"}
-
-
-def normalized(raw):
-    return max(-1.0, min(1.0, raw / 32767.0))
+MODES = {0: "Rell", 1: "CastSpeed", 3: "ButtonPress"}
+PACKET = struct.Struct("<Bh")  # Header, signed int16 little-endian
 
 
 def decode_packet(data):
-    """Liefert (Aktionspfad, Rell als 0/1, sonst bool/float/(x, y)) für genau eine Notification."""
-    if not data:
-        raise ValueError("leeres Paket")
-    header = data[0]
-    kind = header & 3
-    key = ((header >> 2) & 3, header >> 4)
-    size = (1, 1, 3, 5)[kind]
-    if len(data) != size:
-        raise ValueError(f"Header 0x{header:02X} erwartet {size} Byte, erhalten: {len(data)}")
-
-    if kind <= 1 and key == (1, 0):
-        action, value = "Rell", kind
-    elif kind <= 1 and key in BUTTONS:
-        action, value = BUTTONS[key], bool(kind)
-    elif kind == 2 and key in AXES:
-        action = AXES[key]
-        value = normalized(struct.unpack_from("<h", data, 1)[0])
-    elif kind == 3 and key == (1, 2):
-        action = "Aim"
-        x, y = struct.unpack_from("<hh", data, 1)
-        value = (normalized(x), normalized(y))
-    else:
-        raise ValueError(f"unbekannte Aktion oder falscher Typ für Header 0x{header:02X}")
-    return f"{MAP_NAMES[key[0]]}.{action}", value
+    """Dekodiert eine BLE-Notification als (Modusname, aktiv, Wert)."""
+    if len(data) != PACKET.size:
+        raise ValueError(f"erwartet: 3 Byte, erhalten: {len(data)}")
+    header, value = PACKET.unpack(data)
+    if header & 0xF8:
+        raise ValueError(f"reservierte Bits gesetzt: 0x{header:02X}")
+    mode = (header >> 1) & 3
+    if mode not in MODES:
+        raise ValueError(f"unbelegter Modus: {mode:02b}")
+    return MODES[mode], bool(header & 1), value
 
 
 def on_packet(_characteristic, data):
     raw = data.hex(" ").upper()
     try:
-        action, value = decode_packet(data)
+        mode, active, value = decode_packet(data)
     except ValueError as error:
         print(f"[{raw}] Ungültig: {error}")
         return
-    if action == "FishingRod.Rell":
-        display = f"{value} (Kurbel dreht sich)" if value else "0 (Kurbel inaktiv)"
-    elif isinstance(value, bool):
-        display = "gedrückt" if value else "losgelassen"
-    elif isinstance(value, tuple):
-        display = f"x={value[0]:+.3f} y={value[1]:+.3f}"
-    else:
-        display = f"{value:+.3f}"
-    print(f"[{raw}] {action} {display}")
+    print(f"[{raw}] {mode:<11} aktiv={int(active)}  wert={value}")
 
 
 def matches_rod(device, advertisement):
