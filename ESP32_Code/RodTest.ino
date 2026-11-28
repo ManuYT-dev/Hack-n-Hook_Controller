@@ -53,7 +53,7 @@ void loop() {
   } else if (rod::imuState != rod::ImuState::running) {
     castSpeed = 0;
   }
-  publish(ble::Mode::Rell, sample.rellActive, 0);
+  publish(ble::Mode::Rell, sample.rellDirection != 0, sample.rellDirection);
   publish(ble::Mode::CastSpeed, castSpeed != 0, castSpeed);
   publish(ble::Mode::ButtonPress, readCrankButton(), 0);
   delay(10);

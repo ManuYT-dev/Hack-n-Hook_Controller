@@ -30,7 +30,8 @@ def on_packet(_characteristic, data):
     except ValueError as error:
         print(f"[{raw}] Ungültig: {error}")
         return
-    print(f"[{raw}] {mode:<11} aktiv={int(active)}  wert={value}")
+    display = f"{value:+d}" if mode == "Rell" and value else str(value)
+    print(f"[{raw}] {mode:<11} aktiv={int(active)}  wert={display}")
 
 
 def matches_rod(device, advertisement):
