@@ -7,7 +7,7 @@ constexpr int clk = 4, dt = 5;  // Map the encoder's CLK and DT outputs to Helte
 volatile int32_t encoderEdges = 0;  // Keep the signed crank count shared with the interrupt handler.
 constexpr uint32_t crankIdleMs = 75;  // Inaktiv nach 75 ms ohne gültige Encoder-Flanke.
 volatile uint32_t lastCrankEdgeMs = 0;
-volatile bool crankActive = false;
+volatile int8_t crankDirection = 0;  // Last valid step (+1/-1), or 0 when idle.
 uint8_t previousAB;  // Remember the last two encoder input levels to determine direction.
 portMUX_TYPE encoderLock = portMUX_INITIALIZER_UNLOCKED;  // Protect the encoder state while the interrupt or sampling code accesses it.
 DRAM_ATTR const int8_t quadrature[16] = {  // Keep the direction lookup table in RAM for use during interrupts.
@@ -21,7 +21,7 @@ void ARDUINO_ISR_ATTR encoderChanged() {  // Handle either encoder input changin
   if (step != 0) {
     encoderEdges += step;
     lastCrankEdgeMs = millis();
-    crankActive = true;
+    crankDirection = step;
   }
   previousAB = ab;  // Save this state as the starting point for the next edge.
   portEXIT_CRITICAL_ISR(&encoderLock);  // Release the encoder lock so the main loop can read the count.
@@ -125,7 +125,7 @@ struct Sample {
   int16_t accel[3];
   int16_t gyro[3];
   int32_t encoder;
-  bool rellActive;
+  int8_t rellDirection;
   bool imuValid;  // Fresh motion reading in this sample.
 };
 
@@ -152,10 +152,10 @@ Sample sample() {
     }  // End freshness and transfer checks.
   }  // End motion sampling.
   portENTER_CRITICAL(&encoderLock);  // Take the encoder lock before copying the shared count.
-  if (crankActive && uint32_t(millis() - lastCrankEdgeMs) >= crankIdleMs) {
-    crankActive = false;
+  if (crankDirection != 0 && uint32_t(millis() - lastCrankEdgeMs) >= crankIdleMs) {
+    crankDirection = 0;
   }
-  p.rellActive = crankActive;
+  p.rellDirection = crankDirection;
   p.encoder = encoderEdges;  // Capture the cumulative count even when the motion sensor is unavailable.
   portEXIT_CRITICAL(&encoderLock);  // Release the lock immediately so crank interrupts can continue.
   return p;  // Return the local sample to the sketch.
